@@ -12,7 +12,10 @@ A liquid-glass YouTube music player for GitHub Pages. Playback uses the official
 - Share your queue as a link
 - Sleep timer (15, 30, 45, 60 minutes, or after the current song) and playback speed
 - Accent colour, blur and glass strength settings
-- Mini player that appears when you scroll past the video
+- Mini player that appears when you scroll past the video, and expands to show a seek bar
+- Pointer-following border glow on list rows, a play button that leans toward your mouse, and a word-by-word title reveal (all off for reduced-motion settings)
+- Lighter effects mode for slower devices, switched on automatically for low-memory or low-core devices
+- Keyboard-friendly tabs (arrow keys, Home, End), larger touch targets on phones, and a high-contrast mode
 - Installable as an app on phones and desktops
 - Media-key and lock-screen controls
 

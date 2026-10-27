@@ -12,7 +12,7 @@
   [hidden] { display: none !important; }
   :root {
     --accent: #5b8cff; --blur: 28px; --tint: .12;
-    --muted: rgba(255,255,255,.7);
+    --muted: rgba(255,255,255,.8);
     --spring: cubic-bezier(.34, 1.56, .64, 1);
     --ease: cubic-bezier(.2, .8, .2, 1);
     color-scheme: dark;
@@ -121,7 +121,11 @@
   .gbtn.sm { width: 36px; height: 36px; }
   .gbtn.sm svg { width: 17px; height: 17px; }
   .gbtn.on { background: var(--accent); border-color: rgba(255,255,255,.5); }
-  .gbtn.primary { width: 68px; height: 68px; background: var(--accent); border-color: rgba(255,255,255,.55); }
+  .gbtn.primary { width: 68px; height: 68px; background: var(--accent); border-color: rgba(255,255,255,.55);
+                  transform: translate(var(--tx, 0px), var(--ty, 0px));
+                  transition: transform .22s var(--ease), background .25s, box-shadow .25s; }
+  .gbtn.primary:hover { transform: translate(var(--tx, 0px), var(--ty, 0px)) scale(1.06); }
+  .gbtn.primary:active { transform: translate(var(--tx, 0px), var(--ty, 0px)) scale(.92); }
   .gbtn.primary svg { width: 28px; height: 28px; }
   @supports (background: color-mix(in srgb, red, blue)) {
     .gbtn.on { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 80%, #fff), color-mix(in srgb, var(--accent) 55%, transparent));
@@ -241,16 +245,59 @@
   /* ---------- mini player + toast ---------- */
   .mini {
     position: fixed; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); width: min(92vw, 540px); z-index: 20;
-    display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 8px; border-radius: 999px;
-    transform: translate(-50%, 160%); transition: transform .6s var(--spring);
+    padding: 8px 10px 8px 8px; border-radius: 999px;
+    transform: translate(-50%, 160%); transition: transform .6s var(--spring), border-radius .45s var(--spring);
   }
   .mini.show { transform: translate(-50%, 0); }
-  .mini img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: none; box-shadow: 0 3px 10px rgba(0,0,0,.4); }
+  .mini.open { border-radius: 30px; }
+  .mini-row { display: flex; align-items: center; gap: 10px; }
+  .mini-toggle { flex: none; padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; }
+  .mini img { display: block; width: 44px; height: 44px; border-radius: 50%; object-fit: cover; box-shadow: 0 3px 10px rgba(0,0,0,.4); }
+  .mini-more { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .45s var(--spring); }
+  .mini.open .mini-more { grid-template-rows: 1fr; }
+  .mini-more > div { overflow: hidden; min-height: 0; }
+  .mini-seek { display: flex; align-items: center; gap: 10px; padding: 12px 8px 6px; }
+  .mini-seek span { font-size: 12px; color: var(--muted); min-width: 40px; text-align: center; font-variant-numeric: tabular-nums; }
   .mini .mt { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #toast { position: fixed; left: 50%; bottom: 96px; transform: translate(-50%, 12px); max-width: 90vw; padding: 10px 18px; border-radius: 999px;
            font-size: 14px; font-weight: 600; opacity: 0; pointer-events: none; z-index: 30; transition: opacity .3s, transform .5s var(--spring); }
   #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+  /* ---------- interaction polish (original, plain CSS) ---------- */
+  .row { position: relative; }
+  .row::before {   /* border that lights up under the pointer */
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; opacity: 0; transition: opacity .25s;
+    background: radial-gradient(170px circle at var(--rx, 50%) var(--ry, 50%), rgba(255,255,255,.75), transparent 70%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
+  .row:hover::before { opacity: 1; }
+  #np-title .w { display: inline-block; animation: wordIn .7s var(--ease) both; animation-delay: calc(var(--i, 0) * 45ms); }
+  @keyframes wordIn { from { opacity: 0; transform: translateY(.45em); filter: blur(6px); } }
+  .skel { display: flex; align-items: center; gap: 12px; padding: 7px; }
+  .skel i { display: block; border-radius: 11px; background: linear-gradient(100deg, rgba(255,255,255,.08) 30%, rgba(255,255,255,.22) 50%, rgba(255,255,255,.08) 70%); background-size: 200% 100%; animation: shimmer 1.3s linear infinite; }
+  .skel .a { width: 76px; height: 43px; flex: none; }
+  .skel .b { flex: 1; height: 34px; border-radius: 10px; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  /* ---------- lighter effects, touch and contrast ---------- */
+  body.lite { --blur: 12px; }
+  body.lite .blob { display: none; }
+  body.lite .bg-img { inset: 0; transform: none; filter: blur(24px) saturate(1.4) brightness(.7); }
+  body.lite .glass { -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur)); }
+  body.lite .panel { animation: none; }
+  @media (pointer: coarse) {
+    .gbtn.sm { width: 44px; height: 44px; }
+    .tabs button { padding: 11px 16px; }
+    .pill { padding: 11px 16px; }
+    .chip { padding: 10px 14px; }
+    .sw { width: 40px; height: 40px; }
+  }
+  @media (prefers-contrast: more) {
+    :root { --muted: rgba(255,255,255,.95); }
+    .glass { background: rgba(22,24,36,.94); }
+    .gbtn, .pill, .field { border-color: #fff; }
+  }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; }
   }
@@ -267,7 +314,7 @@
   <header class="top">
     <h1><span class="logo" data-icon="play"></span>Tune Box</h1>
     <div class="top-r">
-      <span class="muted" id="status">Loading player…</span>
+      <span class="muted" id="status" aria-live="polite">Loading player…</span>
       <button class="pill" id="b-install" type="button" hidden>Install app</button>
     </div>
   </header>
@@ -373,7 +420,11 @@
         <div class="swatches" id="swatches" role="group" aria-label="Accent colour"></div>
         <label class="slider"><span>Blur</span><input id="s-blur" type="range" min="8" max="60" step="1"></label>
         <label class="slider"><span>Glass</span><input id="s-tint" type="range" min="0.06" max="0.30" step="0.01"></label>
-        <button class="pill" id="s-reset" type="button">Reset look</button>
+        <div class="line">
+          <button class="pill" id="s-lite" type="button" aria-pressed="false">Lighter effects</button>
+          <button class="pill" id="s-reset" type="button">Reset look</button>
+        </div>
+        <div class="note">Lighter effects turns off the drifting colour and lowers the blur. Use it if the page feels slow.</div>
       </div>
       <div class="group">
         <h3>YouTube search key</h3>
@@ -402,10 +453,19 @@
 </div>
 
 <div class="glass mini" id="mini" inert>
-  <img id="mini-img" alt="">
-  <button class="mt" id="mini-title" type="button">Nothing playing</button>
-  <button class="gbtn sm" id="mini-play" type="button" aria-label="Play or pause" data-icon="play"></button>
-  <button class="gbtn sm" id="mini-next" type="button" aria-label="Next" data-icon="next"></button>
+  <div class="mini-row">
+    <button class="mini-toggle" id="mini-toggle" type="button" aria-expanded="false" aria-controls="mini-more" aria-label="Show seek bar"><img id="mini-img" alt=""></button>
+    <button class="mt" id="mini-title" type="button">Nothing playing</button>
+    <button class="gbtn sm" id="mini-play" type="button" aria-label="Play or pause" data-icon="play"></button>
+    <button class="gbtn sm" id="mini-next" type="button" aria-label="Next" data-icon="next"></button>
+  </div>
+  <div class="mini-more" id="mini-more" inert><div>
+    <div class="mini-seek">
+      <span id="mini-cur">0:00</span>
+      <input id="mini-seek" type="range" min="0" max="100" step="1" value="0" aria-label="Seek">
+      <span id="mini-dur">0:00</span>
+    </div>
+  </div></div>
 </div>
 <div class="glass" id="toast" role="status" aria-live="polite"></div>
 
@@ -442,6 +502,9 @@
   };
   const decode = (s) => new DOMParser().parseFromString(s || '', 'text/html').documentElement.textContent;
   const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
+  const mq = (q) => !!(window.matchMedia && window.matchMedia(q).matches);
+  const calm = mq('(prefers-reduced-motion: reduce)');
+  const finePointer = mq('(hover: hover) and (pointer: fine)');
   let toastTimer;
   const toast = (msg) => {
     const el = $('#toast'); el.textContent = msg; el.classList.add('show');
@@ -537,6 +600,10 @@
     accent: /^#[0-9a-f]{6}$/i.test(store.get('accent', '')) ? store.get('accent') : DEFAULTS.accent,
     blur: clamp(Number(store.get('blur', DEFAULTS.blur)) || DEFAULTS.blur, 8, 60),
     tint: clamp(Number(store.get('tint', DEFAULTS.tint)) || DEFAULTS.tint, 0.06, 0.3),
+    // lighter effects: on by default only for low-memory or low-core devices
+    lite: store.get('lite', null) === null
+      ? !!((navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2))
+      : !!store.get('lite', false),
   };
   const pls = store.get('playlists', {});
   if (pls && typeof pls === 'object' && !Array.isArray(pls)) Object.keys(pls).forEach((n) => { const l = cleanList(pls[n]); if (l.length) state.playlists[n] = l; });
@@ -550,19 +617,41 @@
     const r = document.documentElement.style;
     r.setProperty('--accent', state.accent); r.setProperty('--blur', state.blur + 'px'); r.setProperty('--tint', String(state.tint));
   }
+  function applyLite() {
+    document.body.classList.toggle('lite', state.lite);
+    const b = $('#s-lite'); b.setAttribute('aria-pressed', String(state.lite)); b.classList.toggle('on', state.lite);
+  }
 
-  // specular highlight follows the pointer across any glass surface
+  // light follows the pointer: specular highlight on glass, glowing border on the hovered row
   let hlFrame = 0;
   document.addEventListener('pointermove', (e) => {
-    if (hlFrame || !e.target.closest) return;
-    const t = e.target.closest('.glass'); if (!t) return;
-    const x = e.clientX, y = e.clientY;
+    if (hlFrame || !e.target.closest || document.body.classList.contains('lite')) return;
+    const g = e.target.closest('.glass'); if (!g) return;
+    const rw = e.target.closest('.row'), x = e.clientX, y = e.clientY;
     hlFrame = requestAnimationFrame(() => {
-      hlFrame = 0; const b = t.getBoundingClientRect();
-      t.style.setProperty('--mx', ((x - b.left) / b.width * 100).toFixed(1) + '%');
-      t.style.setProperty('--my', ((y - b.top) / b.height * 100).toFixed(1) + '%');
+      hlFrame = 0; let b = g.getBoundingClientRect();
+      g.style.setProperty('--mx', ((x - b.left) / b.width * 100).toFixed(1) + '%');
+      g.style.setProperty('--my', ((y - b.top) / b.height * 100).toFixed(1) + '%');
+      if (rw) { b = rw.getBoundingClientRect(); rw.style.setProperty('--rx', (x - b.left).toFixed(0) + 'px'); rw.style.setProperty('--ry', (y - b.top).toFixed(0) + 'px'); }
     });
   }, { passive: true });
+
+  // the play button leans toward a nearby pointer (mouse only, skipped for reduced motion)
+  if (finePointer && !calm) {
+    const pb = $('#b-play'); let magFrame = 0;
+    document.addEventListener('pointermove', (e) => {
+      if (magFrame) return;
+      const x = e.clientX, y = e.clientY;
+      magFrame = requestAnimationFrame(() => {
+        magFrame = 0;
+        const tx = parseFloat(pb.style.getPropertyValue('--tx')) || 0, ty = parseFloat(pb.style.getPropertyValue('--ty')) || 0;
+        const b = pb.getBoundingClientRect(), cx = b.left + b.width / 2 - tx, cy = b.top + b.height / 2 - ty;
+        const dx = x - cx, dy = y - cy, near = Math.hypot(dx, dy) < 120 && !document.body.classList.contains('lite');
+        pb.style.setProperty('--tx', near ? (dx * 0.18).toFixed(1) + 'px' : '0px');
+        pb.style.setProperty('--ty', near ? (dy * 0.18).toFixed(1) + 'px' : '0px');
+      });
+    }, { passive: true });
+  }
 
   // artwork backdrop with cross-fade
   let bgId = '';
@@ -643,6 +732,7 @@
     });
   }
   function renderResults() {
+    $('#results').removeAttribute('aria-busy');
     renderList($('#results'), results, {
       empty: '',
       current: (it) => state.queue[state.index] && state.queue[state.index].id === it.id,
@@ -693,7 +783,7 @@
     else if (r > tabs.scrollLeft + tabs.clientWidth) tabs.scrollTo({ left: r - tabs.clientWidth + 8, behavior: 'smooth' });
   }
   function showTab(name) {
-    $$('#tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+    $$('#tabs button').forEach((b) => { const on = b.dataset.tab === name; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; });
     $$('.panel').forEach((p) => { p.hidden = p.id !== 'tab-' + name; });
     moveInd();
   }
@@ -768,6 +858,27 @@
   }
 
   /* ---------- now playing ---------- */
+  // the title reveals word by word when a new song starts; later text updates swap in quietly
+  let titleFor = '';
+  function setTitle(it) {
+    const el = $('#np-title'), text = it ? (it.title || 'YouTube video') : 'Nothing playing';
+    const real = !!it && !!it.title && it.title !== PLACEHOLDER && it.title !== 'YouTube video';
+    const key = real ? it.id : '';
+    if (el.dataset.text === text && titleFor === key) return;
+    const animate = real && key !== titleFor && !calm && !document.body.classList.contains('lite');
+    titleFor = key; el.dataset.text = text; el.textContent = ''; el.removeAttribute('aria-label');
+    if (!animate) { el.textContent = text; return; }
+    el.setAttribute('aria-label', text);
+    text.split(' ').forEach((w, i) => {
+      if (i) el.appendChild(document.createTextNode(' '));
+      const s = document.createElement('span'); s.className = 'w'; s.style.setProperty('--i', String(Math.min(i, 12)));
+      s.setAttribute('aria-hidden', 'true'); s.textContent = w; el.appendChild(s);
+    });
+  }
+  function showSkeleton() {
+    const ul = $('#results'); ul.textContent = ''; ul.setAttribute('aria-busy', 'true');
+    for (let i = 0; i < 6; i++) { const li = document.createElement('li'); li.className = 'skel'; li.innerHTML = '<i class="a"></i><i class="b"></i>'; ul.appendChild(li); }
+  }
   function updateLikeBtn() {
     const it = state.queue[state.index], on = !!it && isLiked(it.id), b = $('#b-like');
     b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); setIcon(b, on ? 'heartFill' : 'heart');
@@ -775,10 +886,14 @@
   function updateMini() {
     const show = !cardVisible && state.index >= 0, m = $('#mini');
     m.classList.toggle('show', show); m.inert = !show;
+    if (!show) setMiniOpen(false);
+  }
+  function setMiniOpen(open) {
+    $('#mini').classList.toggle('open', open); $('#mini-toggle').setAttribute('aria-expanded', String(open)); $('#mini-more').inert = !open;
   }
   function updateNowPlaying() {
     const it = state.queue[state.index];
-    $('#np-title').textContent = it ? (it.title || 'YouTube video') : 'Nothing playing';
+    setTitle(it);
     $('#np-author').textContent = it ? (it.author || '') : 'Search for a song or paste a link to start.';
     document.title = it ? (it.title || 'YouTube video') + ' • Tune Box' : 'Tune Box';
     $('#mini-title').textContent = it ? (it.title || 'YouTube video') : 'Nothing playing';
@@ -923,9 +1038,12 @@
   setInterval(() => {
     if (!ready || !player.getDuration) return;
     try {
-      const d = player.getDuration() || 0, t = player.getCurrentTime() || 0, s = $('#seek');
-      if (!seeking) { s.max = d || 100; s.value = t; fillRange(s); $('#cur').textContent = fmt(t); }
-      $('#dur').textContent = fmt(d);
+      const d = player.getDuration() || 0, t = player.getCurrentTime() || 0, s = $('#seek'), ms = $('#mini-seek');
+      if (!seeking) {
+        s.max = d || 100; s.value = t; fillRange(s); $('#cur').textContent = fmt(t);
+        ms.max = d || 100; ms.value = t; fillRange(ms); $('#mini-cur').textContent = fmt(t);
+      }
+      $('#dur').textContent = fmt(d); $('#mini-dur').textContent = fmt(d);
     } catch (e) { /* player not ready */ }
   }, 500);
 
@@ -951,12 +1069,12 @@
   async function search(q) {
     showTab('results'); addRecent(q); results = []; renderResults();
     if (!state.apiKey) { setNote('Search needs a YouTube Data API key. Add one in Settings, or paste a video link instead.', true); return; }
-    setNote('Searching…'); $('#recent').hidden = true;
+    setNote('Searching…'); $('#recent').hidden = true; showSkeleton();
     try {
       const j = await api('search', { part: 'snippet', type: 'video', videoEmbeddable: 'true', videoCategoryId: '10', maxResults: '20', q });
       results = j.items.filter((it) => it.id && it.id.videoId).map((it) => ({ id: it.id.videoId, title: decode(it.snippet.title), author: decode(it.snippet.channelTitle) }));
       setNote(results.length ? '' : 'No songs found for “' + q + '”. Try different words.'); renderResults();
-    } catch (e) { setNote('Search failed: ' + e.message); renderRecent(); }
+    } catch (e) { setNote('Search failed: ' + e.message); renderResults(); }
   }
   async function importPlaylist(listId) {
     if (!state.apiKey) { toast('Playlist import needs an API key. Add one in Settings.'); showTab('settings'); return; }
@@ -1013,8 +1131,29 @@
   $('#b-mute').addEventListener('click', toggleMute);
   $('#b-speed').addEventListener('click', cycleSpeed);
   $('#b-sleep').addEventListener('click', cycleSleep);
-  $('#seek').addEventListener('input', (e) => { seeking = true; $('#cur').textContent = fmt(e.target.value); fillRange(e.target); });
-  $('#seek').addEventListener('change', (e) => { if (ready) player.seekTo(Number(e.target.value), true); seeking = false; });
+  [['#seek', '#cur'], ['#mini-seek', '#mini-cur']].forEach((pair) => {
+    const el = $(pair[0]), label = $(pair[1]);
+    el.addEventListener('input', (e) => { seeking = true; label.textContent = fmt(e.target.value); fillRange(e.target); });
+    el.addEventListener('change', (e) => { if (ready) player.seekTo(Number(e.target.value), true); seeking = false; });
+  });
+  $('#mini-toggle').addEventListener('click', () => setMiniOpen(!$('#mini').classList.contains('open')));
+  $('#s-lite').addEventListener('click', () => { state.lite = !state.lite; store.set('lite', state.lite); applyLite(); });
+
+  // tabs: arrow keys, Home and End move between them, with matching ARIA links
+  $$('#tabs button').forEach((b) => {
+    b.id = 'tabbtn-' + b.dataset.tab; b.setAttribute('aria-controls', 'tab-' + b.dataset.tab);
+    const panel = $('#tab-' + b.dataset.tab); panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', b.id);
+  });
+  $('#tabs').addEventListener('keydown', (e) => {
+    const btns = $$('#tabs button'); let i = btns.indexOf(document.activeElement);
+    if (i < 0) return;
+    if (e.key === 'ArrowRight') i = (i + 1) % btns.length;
+    else if (e.key === 'ArrowLeft') i = (i - 1 + btns.length) % btns.length;
+    else if (e.key === 'Home') i = 0;
+    else if (e.key === 'End') i = btns.length - 1;
+    else return;
+    e.preventDefault(); btns[i].focus(); showTab(btns[i].dataset.tab);
+  });
   $('#vol').addEventListener('input', (e) => setVolume(Number(e.target.value)));
 
   $('#add-all').addEventListener('click', () => { results.forEach((x) => addItem({ ...x })); toast('Added ' + results.length + ' songs'); });
@@ -1076,6 +1215,7 @@
     if (e.target.closest && e.target.closest('input, textarea, select')) return;
     const k = e.key;
     if (k === '/') { e.preventDefault(); $('#q').focus(); return; }
+    if (e.target.closest && e.target.closest('#tabs') && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(k) >= 0) return; // tab navigation
     if (e.target.closest && e.target.closest('button') && (k === ' ' || k === 'Enter')) return; // let focused buttons act normally
     if (k === ' ') { e.preventDefault(); togglePlay(); }
     else if (k === 'n' || k === 'N') next(false);
@@ -1118,12 +1258,12 @@
 
   /* ---------- start ---------- */
   $$('[data-icon]').forEach((el) => setIcon(el, el.dataset.icon));
-  applyTheme(); syncSettings();
+  applyTheme(); applyLite(); syncSettings();
   fillRange($('#seek')); $('#vol').value = state.volume; fillRange($('#vol'));
   updateControls(); renderPlaylists(); refreshLists(); updateNowPlaying(); renderRecent();
   setNote(state.apiKey ? 'Search for a song, or paste a video or playlist link.' : 'Paste a video link to start. Search needs a YouTube Data API key (see Settings).', false);
   state.queue.forEach(ensureMeta);
-  requestAnimationFrame(moveInd);
+  showTab('results'); requestAnimationFrame(moveInd);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(moveInd);
 
   // shared links: ?ids=a,b,c queues songs; ?add_song=<link> queues one
