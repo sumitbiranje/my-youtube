@@ -155,6 +155,11 @@
   /* the frame is scaled up past the video's edges, like YouTube's ambient mode, so its edge colours spill outward */
   .amb-layer { position: absolute; inset: 6% 4%; background-size: cover; background-position: center; opacity: 0; transform: scale(1.08); transition: opacity 2.4s ease; }
   .amb-layer.on { opacity: 1; }
+  /* live ambient: a second muted copy of the video, sized to cover the glow area (16:9, centred) */
+  .amb-live { position: absolute; top: 6%; height: 88%; left: 50%; aspect-ratio: 16 / 9; transform: translateX(-50%); opacity: 0; transition: opacity 1s ease; }
+  .amb-live.on { opacity: 1; }
+  .amb-live iframe { width: 100%; height: 100%; border: 0; pointer-events: none; }
+  #scout { position: fixed; left: -10000px; top: 0; width: 200px; height: 200px; opacity: 0; pointer-events: none; }
   body:not(.is-playing) .ambient { opacity: .6; }
   body.no-ambient .ambient { display: none; }
   body.lite .ambient { --amb-blur: 30px; }
@@ -448,7 +453,14 @@
         <div class="note" id="results-note"></div>
         <ul class="list" id="results"></ul>
       </section>
-      <section class="panel" id="panel-queue" aria-labelledby="section-title" hidden><ul class="list" id="queue"></ul></section>
+      <section class="panel" id="panel-queue" aria-labelledby="section-title" hidden>
+        <ul class="list" id="queue"></ul>
+        <div class="acct">
+          <div class="line"><h2 class="subhead">Up next from YouTube</h2><button class="pill" id="ap-toggle" type="button" aria-pressed="true">Autoplay</button></div>
+          <div class="note" id="recs-note"></div>
+          <ul class="list" id="recs"></ul>
+        </div>
+      </section>
       <section class="panel" id="panel-liked" aria-labelledby="section-title" hidden><ul class="list" id="liked"></ul></section>
       <section class="panel" id="panel-history" aria-labelledby="section-title" hidden><ul class="list" id="history"></ul></section>
       <section class="panel" id="panel-playlists" aria-labelledby="section-title" hidden>
@@ -475,11 +487,13 @@
           <label class="slider"><span>Tint</span><input id="s-tint" type="range" min="0" max="0.2" step="0.01"><output id="o-tint"></output></label>
           <div class="line">
             <button class="pill" id="s-amb" type="button" aria-pressed="true">Ambient glow</button>
+            <button class="pill" id="s-live" type="button" aria-pressed="false">Live ambient</button>
             <button class="pill" id="s-lens" type="button" aria-pressed="true">Edge refraction</button>
             <button class="pill" id="s-lite" type="button" aria-pressed="false">Lighter effects</button>
             <button class="pill" id="s-reset" type="button">Reset look</button>
           </div>
-          <p>Ambient glow lights up the space around the video with colours from the song's video frames, changing as it plays.</p>
+          <p>Ambient glow lights up the space around the video with colours from the song's video frames, changing a few times as it plays.</p>
+          <p id="live-note">Live ambient plays a second muted copy of the video behind the player, so the glow follows every scene like YouTube's ambient mode. It uses about twice the data and more battery, so it's best on computers and recent phones. It stays off in Lighter effects mode.</p>
           <p id="lens-note">Edge refraction bends what is behind the glass, like a lens. It works in Chrome and Edge. Lighter effects turns off the moving colour and refraction if the page feels slow.</p>
         </div>
         <div class="group">
@@ -528,7 +542,7 @@
 
   <section class="stage" id="stage" aria-label="Video">
     <div class="video-wrap">
-      <div class="ambient" aria-hidden="true"><div class="amb-layer" id="amb-a"></div><div class="amb-layer" id="amb-b"></div></div>
+      <div class="ambient" aria-hidden="true"><div class="amb-layer" id="amb-a"></div><div class="amb-layer" id="amb-b"></div><div class="amb-live" id="amb-live"></div></div>
       <div class="video-frame" id="video-frame">
         <div id="player"></div>
         <div class="video-empty" id="video-empty">
@@ -589,6 +603,7 @@
   </nav>
 </div>
 <div class="glass" id="toast" role="status" aria-live="polite"></div>
+<div id="scout" aria-hidden="true"></div>
 
 <script>
 (() => {
@@ -740,6 +755,8 @@
     lens: store.get('lens', true) !== false,
     lite: store.get('lite', null) === null ? lowEnd : !!store.get('lite', false),
     ambient: store.get('ambient', true) !== false,
+    liveAmb: store.get('liveAmb', false) === true,
+    autoplay: store.get('autoplay', true) !== false,
     section: 'search',
     lastLib: 'liked',
   };
@@ -770,6 +787,7 @@
     const l = $('#s-lens'); l.setAttribute('aria-pressed', String(state.lens && lensSupported)); l.disabled = !lensSupported;
     if (!lensSupported) l.title = 'Needs Chrome or Edge';
     applyLens();
+    if (typeof liveSetup === 'function' && $('#s-live')) { liveSetup(); syncLiveBtn(); }
   }
 
   /* ================= edge refraction (Chromium) =================
@@ -921,7 +939,8 @@
     document.body.classList.toggle('no-ambient', !state.ambient);
     const b = $('#s-amb'); b.setAttribute('aria-pressed', String(state.ambient));
     if (!state.ambient) { clearAmbient(); colorFor = ''; document.documentElement.style.removeProperty('--amb'); }
-    else { const id = curId(); setAmbient(id, 0); sampleColor(id); }
+    else { const id = curId(); setAmbient(id, curProgress()); sampleColor(id); }
+    liveSetup(); syncLiveBtn();
   }
 
   // specular highlight follows the pointer on glass; list rows get a glowing border
@@ -1019,6 +1038,7 @@
     $('#side-count').textContent = state.queue.length;
     const bd = $('#tab-badge'); bd.textContent = state.queue.length ? String(state.queue.length) : ''; bd.dataset.n = String(state.queue.length);
     $('[data-go=queue].nav-btn').setAttribute('aria-label', 'Queue, ' + state.queue.length + (state.queue.length === 1 ? ' song' : ' songs'));
+    renderRecs();   // hide suggestions that are now in the queue
   }
   const libOpts = (empty) => ({
     empty, emptyAction: ['Find songs', goSearch],
@@ -1296,10 +1316,22 @@
   const fillRange = (el) => el.style.setProperty('--p', ((el.value - el.min) / ((el.max - el.min) || 1) * 100) + '%');
 
   /* ================= playback ================= */
-  function playAt(i) {
+  /* Previous and Next follow what you actually heard, like YouTube: Previous steps back through
+     the songs played this session (shuffle included), and Next retraces those steps before moving on. */
+  const nav = { back: [], fwd: [] }, cycle = new Set();
+  const idxOf = (id) => state.queue.findIndex((q) => q.id === id);
+  function playAt(i, via) {
     if (i < 0 || i >= state.queue.length) return;
+    const from = curId(), to = state.queue[i].id;
+    if (from && from !== to && via !== 'nav') {
+      nav.back.push(from); if (nav.back.length > 100) nav.back.shift();
+      if (via !== 'next') nav.fwd.length = 0;   // a song picked by hand starts a new path
+    }
+    if (state.shuffle) cycle.add(to);
+    autoWaiting = false;
     state.index = i; loggedId = ''; saveQueue(); renderQueue(); updateNowPlaying();
-    if (ready) player.loadVideoById(state.queue[i].id); else pendingPlay = true;
+    if (ready) player.loadVideoById(to); else pendingPlay = true;
+    liveLoad(to, 0);
   }
   function cueAt(i) {
     if (i < 0 || i >= state.queue.length) return;
@@ -1310,17 +1342,36 @@
     const n = state.queue.length;
     if (!n) return -1;
     if (state.repeat === 'one' && auto) return state.index;
-    if (state.shuffle && n > 1) { let j; do { j = Math.floor(Math.random() * n); } while (j === state.index); return j; }
+    if (state.shuffle && n > 1) {
+      // every song once before any repeats, like a shuffled YouTube playlist
+      const cur = curId(), all = state.queue.map((_, i) => i).filter((i) => state.queue[i].id !== cur);
+      let pool = all.filter((i) => !cycle.has(state.queue[i].id));
+      if (!pool.length) { if (state.repeat !== 'all') return -1; cycle.clear(); if (cur) cycle.add(cur); pool = all; }
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
     const j = state.index + 1;
     if (j < n) return j;
     return state.repeat === 'all' ? 0 : -1;
   }
-  function next(auto) { const j = nextIndex(auto); if (j >= 0) playAt(j); else if (!auto) toast('End of queue'); }
+  function next(auto) {
+    while (nav.fwd.length) {   // after going back, Next retraces your steps first
+      const i = idxOf(nav.fwd.pop());
+      if (i >= 0 && i !== state.index) { const cur = curId(); if (cur) nav.back.push(cur); playAt(i, 'nav'); return; }
+    }
+    const j = nextIndex(auto);
+    if (j >= 0) { if (j === state.index) { if (ready) { player.seekTo(0, true); player.playVideo(); liveSeek(0); } } else playAt(j, 'next'); return; }
+    if (state.autoplay && playRecommended()) return;
+    if (!auto) toast(state.autoplay ? 'No recommendations yet. Try again in a moment.' : 'End of queue. Turn on Autoplay in Queue to keep going.');
+  }
   function prev() {
-    if (ready && player.getCurrentTime() > 3) { player.seekTo(0, true); return; }
-    if (state.index > 0) playAt(state.index - 1);
-    else if (state.repeat === 'all' && state.queue.length) playAt(state.queue.length - 1);
-    else if (ready) player.seekTo(0, true);
+    if (ready && state.index >= 0 && player.getCurrentTime() > 3) { player.seekTo(0, true); liveSeek(0); return; }
+    while (nav.back.length) {   // the song you actually heard before this one
+      const i = idxOf(nav.back.pop());
+      if (i >= 0 && i !== state.index) { const cur = curId(); if (cur) nav.fwd.push(cur); playAt(i, 'nav'); return; }
+    }
+    if (!state.shuffle && state.index > 0) playAt(state.index - 1, 'nav');   // nothing earlier this session: use queue order
+    else if (!state.shuffle && state.repeat === 'all' && state.queue.length > 1) playAt(state.queue.length - 1, 'nav');
+    else if (ready) { player.seekTo(0, true); liveSeek(0); }
   }
   function togglePlay() {
     if (!ready) { toast('The player is still loading'); return; }
@@ -1330,7 +1381,7 @@
     else if (state.index < 0) playAt(0);
     else player.playVideo();
   }
-  function seekBy(sec) { if (ready) player.seekTo(clamp(player.getCurrentTime() + sec, 0, player.getDuration() || 0), true); }
+  function seekBy(sec) { if (!ready) return; const t = clamp(player.getCurrentTime() + sec, 0, player.getDuration() || 0); player.seekTo(t, true); liveSeek(t); }
   function setVolume(v) {
     state.volume = clamp(Math.round(v), 0, 100); store.set('volume', state.volume);
     const el = $('#vol'); el.value = state.volume; fillRange(el);
@@ -1374,7 +1425,164 @@
   }
   const mediaState = (s) => { if ('mediaSession' in navigator) { try { navigator.mediaSession.playbackState = s; } catch (e) { /* ignore */ } } };
 
+  let ytApi = false;
+  const curTime = () => { try { return ready ? player.getCurrentTime() || 0 : 0; } catch (e) { return 0; } };
+
+  /* ================= live ambient (opt-in) =================
+     A second, muted copy of the video plays inside the blurred glow and is kept in step with the main player. */
+  const live = { p: null, ready: false, failed: false, failTimer: 0 };
+  const liveWanted = () => state.liveAmb && state.ambient && !state.lite && !live.failed && ytApi;
+  function liveSetup() {
+    if (!liveWanted()) { liveTeardown(); return; }
+    if (live.p) return;
+    const host = $('#amb-live'); host.textContent = '';
+    const d = document.createElement('div'); d.id = 'amb-player'; host.appendChild(d);
+    live.p = new YT.Player('amb-player', {
+      width: '100%', height: '100%',
+      playerVars: { mute: 1, controls: 0, disablekb: 1, playsinline: 1, rel: 0, iv_load_policy: 3, fs: 0, modestbranding: 1 },
+      events: {
+        onReady() { live.ready = true; try { live.p.mute(); } catch (e) { /* ignore */ } const id = curId(); if (id) liveLoad(id, curTime()); },
+        onStateChange(e) { $('#amb-live').classList.toggle('on', e.data === 1 || e.data === 2); if (e.data === 1) clearTimeout(live.failTimer); },
+      },
+    });
+  }
+  function liveTeardown() {
+    clearTimeout(live.failTimer);
+    if (live.p) { try { live.p.destroy(); } catch (e) { /* ignore */ } }
+    live.p = null; live.ready = false;
+    const host = $('#amb-live'); host.classList.remove('on'); host.textContent = '';
+  }
+  function liveLoad(id, t) {
+    if (!live.p || !live.ready || !id) return;
+    try { live.p.loadVideoById({ videoId: id, startSeconds: t || 0 }); live.p.mute(); live.p.setPlaybackRate(state.speed); } catch (e) { return; }
+    // if this device won't play two videos at once, go back to still frames
+    clearTimeout(live.failTimer);
+    live.failTimer = setTimeout(() => {
+      try { if (live.p && player.getPlayerState() === 1 && live.p.getPlayerState() !== 1) throw new Error('stalled'); } catch (e) {
+        live.failed = true; liveTeardown(); syncLiveBtn();
+        toast('Live ambient couldn’t start on this device, so the glow is using still frames.');
+      }
+    }, 9000);
+  }
+  function liveSeek(t) { try { if (live.p && live.ready) live.p.seekTo(t, true); } catch (e) { /* ignore */ } }
+  function liveSync() {
+    if (!live.p || !live.ready || !ready) return;
+    try {
+      const id = curId(), ms = player.getPlayerState(), ls = live.p.getPlayerState(), lv = (live.p.getVideoData() || {}).video_id;
+      if (id && lv !== id) { liveLoad(id, curTime()); return; }
+      if (ms === 1 && ls !== 1 && ls !== 3) live.p.playVideo();
+      if (ms !== 1 && ls === 1) live.p.pauseVideo();
+      const t = curTime(), lt = live.p.getCurrentTime() || 0;
+      if (ms === 1 && Math.abs(lt - t) > 0.8) live.p.seekTo(t + 0.25, true);
+      if (live.p.getPlaybackRate && live.p.getPlaybackRate() !== state.speed) live.p.setPlaybackRate(state.speed);
+    } catch (e) { /* players not ready */ }
+  }
+  setInterval(liveSync, 1500);
+  function syncLiveBtn() {
+    const b = $('#s-live'), usable = state.ambient && !state.lite && !live.failed;
+    b.setAttribute('aria-pressed', String(state.liveAmb && usable)); b.disabled = !usable;
+    b.title = live.failed ? 'This device couldn’t play the live glow' : !state.ambient ? 'Turn on Ambient glow first' : state.lite ? 'Off in Lighter effects mode' : '';
+  }
+
+  /* ================= Up next: YouTube recommendations =================
+     The official API no longer returns related videos, so this reads YouTube's own Mix for the song
+     ("RD" + video id) through a hidden helper player that is cued but never played. If the Mix won't load,
+     it falls back to searching for more from the same artist (needs an API key or sign-in). */
+  const scout = { p: null, ready: false, cb: null, chain: Promise.resolve() };
+  function scoutEnsure(cb) {
+    if (!ytApi) { cb(false); return; }
+    if (scout.p) { if (scout.ready) cb(true); else scout.cb = cb; return; }
+    const d = document.createElement('div'); d.id = 'scout-player'; $('#scout').appendChild(d);
+    scout.cb = cb;
+    scout.p = new YT.Player('scout-player', {
+      width: '200', height: '200', playerVars: { mute: 1, controls: 0, autoplay: 0, playsinline: 1 },
+      events: { onReady() { scout.ready = true; const c = scout.cb; scout.cb = null; if (c) c(true); } },
+    });
+  }
+  function mixIds(id) {
+    const job = () => new Promise((resolve) => {
+      scoutEnsure((ok) => {
+        if (!ok || curId() !== id) { resolve([]); return; }   // skip lookups for songs you've already moved past
+        try { scout.p.cuePlaylist({ list: 'RD' + id, listType: 'playlist', index: 0 }); } catch (e) { resolve([]); return; }
+        let n = 0;
+        const t = setInterval(() => {
+          n++; let ids = [];
+          try { ids = scout.p.getPlaylist() || []; } catch (e) { /* not ready */ }
+          if ((ids.length && ids.indexOf(id) >= 0) || n > 14) { clearInterval(t); resolve(ids.indexOf(id) >= 0 ? ids.filter((x) => ID_RE.test(x) && x !== id) : []); }
+        }, 300);
+      });
+    });
+    scout.chain = scout.chain.then(job, job);   // one lookup at a time
+    return scout.chain;
+  }
+  async function describe(ids) {
+    ids = ids.slice(0, 25);
+    if (canQuery()) {
+      try {
+        const j = await api('videos', { part: 'snippet', id: ids.join(',') });
+        const map = new Map((j.items || []).map((v) => [v.id, { id: v.id, title: String(v.snippet.title || ''), author: String(v.snippet.channelTitle || '') }]));
+        return ids.map((id) => map.get(id)).filter(Boolean);
+      } catch (e) { /* fall through to oEmbed */ }
+    }
+    const out = await Promise.all(ids.slice(0, 15).map(async (id) => {
+      try {
+        const r = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id));
+        if (!r.ok) return null; const j = await r.json(); return { id, title: j.title || 'YouTube video', author: j.author_name || '' };
+      } catch (e) { return null; }
+    }));
+    return out.filter(Boolean);
+  }
+  const recCache = new Map();
+  let recs = [], recsFor = '', recsBusy = false;
+  async function getRecs(it) {
+    if (recCache.has(it.id)) return recCache.get(it.id);
+    let ids = await mixIds(it.id), items = [];
+    if (ids.length) items = await describe(ids);
+    if (!items.length && canQuery() && (it.author || it.title)) {
+      const j = await api('search', { part: 'snippet', type: 'video', videoEmbeddable: 'true', videoCategoryId: '10', maxResults: '15', q: it.author || it.title });
+      items = (j.items || []).filter((x) => x.id && ID_RE.test(x.id.videoId) && x.id.videoId !== it.id).map((x) => ({ id: x.id.videoId, title: decode(x.snippet.title), author: decode(x.snippet.channelTitle) }));
+    }
+    if (items.length) recCache.set(it.id, items);
+    return items;
+  }
+  function visibleRecs() {
+    const recent = new Set(state.history.slice(0, 15).map((h) => h.id));
+    return recs.filter((r) => idxOf(r.id) < 0 && !recent.has(r.id)).slice(0, 15);
+  }
+  function renderRecs() {
+    const list = visibleRecs(), note = $('#recs-note');
+    const ap = $('#ap-toggle'); ap.setAttribute('aria-pressed', String(state.autoplay)); ap.classList.toggle('on', state.autoplay);
+    if (recsBusy) { note.hidden = false; note.textContent = 'Finding songs like this one…'; }
+    else if (!curId()) { note.hidden = false; note.textContent = 'Play a song to see what YouTube would play next.'; }
+    else if (!list.length) { note.hidden = false; note.textContent = recs.length ? 'Everything YouTube suggested is already in your queue.' : 'No recommendations for this song. YouTube may not offer a Mix for it.'; }
+    else note.hidden = true;
+    renderList($('#recs'), recsBusy ? [] : list, libOpts(''));
+  }
+  async function refreshRecs() {
+    const it = state.queue[state.index];
+    if (!it) { recs = []; recsFor = ''; renderRecs(); return; }
+    if (recsFor === it.id) { renderRecs(); return; }
+    recsFor = it.id; recsBusy = true; renderRecs();
+    let items = [];
+    try { items = await getRecs(it); } catch (e) { /* show the empty note */ }
+    if (recsFor !== it.id) return;
+    recs = items; recsBusy = false; animateNext.add('recs'); renderRecs();
+    if (autoWaiting) { autoWaiting = false; if (!playRecommended()) toast('End of queue. YouTube had nothing to suggest for this song.'); }
+  }
+  // only use suggestions for the song that just played; if they're still loading, wait for them
+  let autoWaiting = false;
+  function playRecommended() {
+    const id = curId();
+    if (!id) return false;
+    if (recsFor !== id || recsBusy) { autoWaiting = true; if (recsFor !== id) refreshRecs(); toast('Finding what to play next…'); return true; }
+    const r = visibleRecs()[0];
+    if (!r) return false;
+    playAt(addItem({ ...r }), 'next'); toast('Autoplay: ' + (r.title || 'next song'));
+    return true;
+  }
+
   window.onYouTubeIframeAPIReady = () => {
+    ytApi = true;
     player = new YT.Player('player', {
       width: '100%', height: '100%',
       playerVars: { playsinline: 1, rel: 0, modestbranding: 1 },
@@ -1385,6 +1593,7 @@
           if (state.index >= 0 && state.queue[state.index]) {
             if (pendingPlay) player.loadVideoById(state.queue[state.index].id); else player.cueVideoById(state.queue[state.index].id);
           }
+          liveSetup(); setTimeout(refreshRecs, 1200);
         },
         onStateChange(e) {
           const playing = e.data === 1;
@@ -1395,17 +1604,18 @@
             if (it && d && d.video_id === it.id && d.title && d.title !== it.title) {
               it.title = d.title; if (d.author) it.author = d.author; saveQueue(); updateNowPlaying();
             }
-            if (it && loggedId !== it.id) { loggedId = it.id; logHistory(it); }
+            if (it && loggedId !== it.id) { loggedId = it.id; logHistory(it); setTimeout(refreshRecs, 800); }
             refreshLists();
             if (player.getPlaybackRate && player.getPlaybackRate() !== state.speed) player.setPlaybackRate(state.speed);
             mediaState('playing');
           } else if (e.data === 2) mediaState('paused');
+          liveSync();
           if (e.data === 0) onEnded();
         },
         onError() {
           errorStreak++;
           toast('This video can’t play here. It may be unavailable or block embedding.');
-          if (errorStreak < state.queue.length && nextIndex(true) !== state.index) setTimeout(() => next(true), 1200);
+          if (state.repeat !== 'one' && errorStreak < 5) setTimeout(() => next(true), 1200);
         },
       },
     });
@@ -1647,7 +1857,10 @@
   $('#mini-open').addEventListener('click', openSheet);
   $('#np-close').addEventListener('click', () => closeSheet());
   $('#scrim').addEventListener('click', () => closeSheet());
-  $('#b-shuffle').addEventListener('click', () => { state.shuffle = !state.shuffle; saveQueue(); updateControls(); toast(state.shuffle ? 'Shuffle on' : 'Shuffle off'); });
+  $('#b-shuffle').addEventListener('click', () => {
+    state.shuffle = !state.shuffle; cycle.clear(); if (state.shuffle && curId()) cycle.add(curId());
+    saveQueue(); updateControls(); toast(state.shuffle ? 'Shuffle on' : 'Shuffle off');
+  });
   $('#b-repeat').addEventListener('click', () => {
     state.repeat = state.repeat === 'off' ? 'all' : state.repeat === 'all' ? 'one' : 'off'; saveQueue(); updateControls();
     toast(state.repeat === 'off' ? 'Repeat off' : state.repeat === 'all' ? 'Repeat queue' : 'Repeat this song');
@@ -1658,7 +1871,7 @@
   $('#b-speed').addEventListener('click', cycleSpeed);
   $('#b-sleep').addEventListener('click', cycleSleep);
   $('#seek').addEventListener('input', (e) => { seeking = true; $('#cur').textContent = fmt(e.target.value); fillRange(e.target); });
-  $('#seek').addEventListener('change', (e) => { if (ready) player.seekTo(Number(e.target.value), true); seeking = false; });
+  $('#seek').addEventListener('change', (e) => { if (ready) player.seekTo(Number(e.target.value), true); liveSeek(Number(e.target.value)); seeking = false; });
   $('#vol').addEventListener('input', (e) => setVolume(Number(e.target.value)));
 
   $('#pl-save').addEventListener('click', () => {
@@ -1702,6 +1915,11 @@
   $('#s-lens').addEventListener('click', () => { state.lens = !state.lens; store.set('lens', state.lens); applyLite(); });
   $('#s-lite').addEventListener('click', () => { state.lite = !state.lite; store.set('lite', state.lite); applyLite(); });
   $('#s-amb').addEventListener('click', () => { state.ambient = !state.ambient; store.set('ambient', state.ambient); applyAmbient(); toast(state.ambient ? 'Ambient glow on' : 'Ambient glow off'); });
+  $('#s-live').addEventListener('click', () => {
+    state.liveAmb = !state.liveAmb; store.set('liveAmb', state.liveAmb); liveSetup(); syncLiveBtn();
+    toast(state.liveAmb ? 'Live ambient on. The glow will follow the video.' : 'Live ambient off. The glow uses still frames.');
+  });
+  $('#ap-toggle').addEventListener('click', () => { state.autoplay = !state.autoplay; store.set('autoplay', state.autoplay); renderRecs(); toast(state.autoplay ? 'Autoplay on' : 'Autoplay off'); });
   $('#s-reset').addEventListener('click', () => {
     state.accent = DEFAULTS.accent; state.blur = DEFAULTS.blur; state.tint = DEFAULTS.tint; state.lens = true;
     store.set('accent', state.accent); store.set('glassBlur', state.blur); store.set('glassTint', state.tint); store.set('lens', true);
@@ -1755,7 +1973,7 @@
     set('pause', () => ready && player.pauseVideo());
     set('previoustrack', prev);
     set('nexttrack', () => next(false));
-    set('seekto', (d) => ready && d.seekTime != null && player.seekTo(d.seekTime, true));
+    set('seekto', (d) => { if (ready && d.seekTime != null) { player.seekTo(d.seekTime, true); liveSeek(d.seekTime); } });
   }
 
   let deferred = null;

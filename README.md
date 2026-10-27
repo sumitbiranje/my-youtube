@@ -18,12 +18,16 @@ A full-screen, liquid-glass YouTube music player for GitHub Pages. Playback uses
 ## Ambient glow
 
 Light from the video spills around the player, similar to YouTube's ambient mode. YouTube's own version reads live video frames, which a web page can't do with an embedded player. Tune Box uses the still frames YouTube publishes for each video instead: the cover, then frames from about 25%, 50% and 75% through. It cross-fades between them as the song plays and tints the page with the video's main colour. Turn it off under Settings, then Look.
+
+**Live ambient (optional, off by default):** for a glow that follows every scene, turn on "Live ambient" in Settings, then Look. It plays a second, muted copy of the video inside the blurred glow and keeps it in step with the main player (pause, seek, speed and song changes). It uses about twice the data and more battery, so it suits computers and recent phones. It stays off in Lighter effects mode, and if a device won't play two videos at once, Tune Box switches back to the still frames on its own.
 - Settings let you change the accent colour, blur, tint and refraction. A "Lighter effects" mode turns on automatically on low-end devices. Reduced transparency and reduced motion settings are respected.
 
 ## Features
 
 - Paste a YouTube video or playlist link, or search by name
 - Queue with shuffle, repeat (off, all, one), play next, reorder and remove
+- **Up next:** YouTube's own Mix for the current song appears under your queue. With Autoplay on, it keeps playing from there when the queue ends. No API key needed; if a song has no Mix, it falls back to more songs by the same artist (needs an API key or sign-in).
+- **Previous and Next like YouTube:** Previous goes back to the song you actually heard before (after shuffle or a song picked from anywhere), Next retraces your steps after going back, and shuffle plays every queued song once before repeating.
 - Liked songs, play history and saved playlists, with JSON export and import
 - Import your liked videos and playlists from your YouTube account (see below)
 - Share your queue as a link
@@ -73,6 +77,7 @@ YouTube Music's automatic playlists (like "Liked music" or mixes) aren't availab
 
 - The player uses the YouTube embed, so your browser still connects to YouTube. This app does not hide that.
 - Some videos disable embedding. The app skips them automatically.
+- The YouTube API no longer returns related videos, so Up next reads the song's Mix through a hidden helper player that is loaded but never played. Live ambient plays a blurred second player. Both are unofficial uses of YouTube's embed and may stop working if YouTube changes it, and blurring a player isn't allowed under YouTube's embed rules. They're meant for personal use.
 - Saved data uses keys that start with `tunebox:`, so it doesn't touch other pages on the same `github.io` address. "Delete saved data" in Settings removes only those keys.
 - Never commit your API key to the repository.
 
