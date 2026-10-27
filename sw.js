@@ -1,7 +1,7 @@
 // Network-first service worker: always tries the live site so updates appear,
 // and falls back to the cached copy when offline. The YouTube player itself
 // still needs a connection.
-const CACHE = 'tunebox-v2';
+const CACHE = 'tunebox-v3';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (event) => {
