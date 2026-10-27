@@ -46,7 +46,7 @@
             filter: blur(70px) saturate(1.6) brightness(.62); transform: scale(1.1); transition: opacity 1.4s ease; }
   .bg-art.on { opacity: 1; }
   .glow { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .42; will-change: transform; }
-  .g1 { width: 62vmax; height: 62vmax; left: -22vmax; top: -24vmax; background: var(--indigo); animation: drift1 30s ease-in-out infinite alternate; }
+  .g1 { width: 62vmax; height: 62vmax; left: -22vmax; top: -24vmax; background: rgb(var(--amb, 67 56 202)); transition: background-color 2s ease; animation: drift1 30s ease-in-out infinite alternate; }
   .g2 { width: 48vmax; height: 48vmax; right: -18vmax; bottom: -20vmax; background: var(--accent); opacity: .22; animation: drift2 36s ease-in-out infinite alternate; }
   @keyframes drift1 { to { transform: translate(12vw, 14vh) scale(1.1); } }
   @keyframes drift2 { to { transform: translate(-14vw, -10vh) scale(.92); } }
@@ -137,14 +137,27 @@
   input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.45); }
 
   /* ---------------- app shell: mobile-first ---------------- */
-  .shell { position: relative; height: 100vh;   /* no z-index: the sheet must stack above the dock */ height: 100dvh; display: flex; flex-direction: column; }
+  .shell { position: relative; overflow: hidden; height: 100vh;   /* clip the ambient glow at the screen edge so phones don't zoom out */   /* no z-index: the sheet must stack above the dock */ height: 100dvh; display: flex; flex-direction: column; }
   .sidebar { display: none; }
   .stage { flex: none; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) var(--s2) max(12px, env(safe-area-inset-left)); }
+  .video-wrap { position: relative; width: min(100%, calc(34dvh * 16 / 9)); margin: 0 auto; }
   .video-frame {
-    position: relative; width: min(100%, calc(34dvh * 16 / 9)); margin: 0 auto; aspect-ratio: 16 / 9;
+    position: relative; z-index: 1; width: 100%; aspect-ratio: 16 / 9;
     border-radius: var(--r-md); overflow: hidden; background: #000;
-    box-shadow: 0 14px 40px rgba(0,0,0,.5), 0 0 0 .5px rgba(255,255,255,.18);
+    box-shadow: 0 14px 40px rgba(0,0,0,.45), 0 0 0 .5px rgba(255,255,255,.18);
   }
+  /* ambient glow: blurred frames of the current video spill light around the player */
+  .ambient {
+    position: absolute; z-index: 0; inset: -38% -20%; pointer-events: none; opacity: 1; transition: opacity 1.2s ease;
+    filter: blur(var(--amb-blur, 44px)) saturate(1.9) brightness(1.25);
+    -webkit-mask: radial-gradient(closest-side, #000 58%, transparent); mask: radial-gradient(closest-side, #000 58%, transparent);
+  }
+  /* the frame is scaled up past the video's edges, like YouTube's ambient mode, so its edge colours spill outward */
+  .amb-layer { position: absolute; inset: 6% 4%; background-size: cover; background-position: center; opacity: 0; transform: scale(1.08); transition: opacity 2.4s ease; }
+  .amb-layer.on { opacity: 1; }
+  body:not(.is-playing) .ambient { opacity: .6; }
+  body.no-ambient .ambient { display: none; }
+  body.lite .ambient { --amb-blur: 30px; }
   .video-frame iframe, #player { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   .video-empty {
     position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: var(--s2); padding: var(--s4); text-align: center;
@@ -154,7 +167,7 @@
   .video-empty .logo svg { width: 22px; height: 22px; }
   .video-empty p { margin: 0; max-width: 32ch; }
 
-  .content { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.25) transparent;
+  .content { position: relative; z-index: 1; flex: 1; min-height: 0;   /* above the ambient glow, so the glow shows behind the list */ overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.25) transparent;
              padding: 0 max(12px, env(safe-area-inset-right)) calc(var(--dock-h) + var(--s5)) max(12px, env(safe-area-inset-left)); }
   .content-inner { max-width: 760px; margin: 0 auto; }
 
@@ -235,6 +248,9 @@
   .skel .b { flex: 1; height: 32px; }
   @keyframes shimmer { to { background-position: -200% 0; } }
 
+  .acct { margin-top: var(--s5); padding-top: var(--s3); border-top: .5px solid rgba(255,255,255,.12); }
+  .subhead { margin: 0; flex: 1; min-width: 160px; font-size: 17px; font-weight: 700; }
+
   /* ---------------- settings ---------------- */
   .group { padding: var(--s4) var(--s1) var(--s5); }
   .group + .group { border-top: .5px solid rgba(255,255,255,.12); }
@@ -308,14 +324,14 @@
     .content { padding-left: max(24px, env(safe-area-inset-left)); padding-right: max(24px, env(safe-area-inset-right)); }
     .dock { left: calc(var(--sheet-left) + max(0px, (100vw - var(--sheet-left) - 640px) / 2)); right: max(0px, (100vw - var(--sheet-left) - 640px) / 2); }
     .np { max-width: 640px; left: calc(var(--sheet-left) + max(8px, (100vw - var(--sheet-left) - 640px) / 2)); right: auto; width: calc(100vw - var(--sheet-left) - 16px); }
-    .video-frame { width: min(100%, calc(38dvh * 16 / 9)); }
+    .video-wrap { width: min(100%, calc(38dvh * 16 / 9)); }
   }
   /* phone held sideways: video on the left, everything else on the right */
   @media (max-width: 1023px) and (orientation: landscape) and (max-height: 560px) {
     :root { --sheet-left: 44vw; }
     .shell { display: grid; grid-template-columns: 44vw minmax(0, 1fr); }
     .stage { align-self: start; padding: max(8px, env(safe-area-inset-top)) var(--s2) 0 max(12px, env(safe-area-inset-left)); }
-    .video-frame { width: 100%; }
+    .video-wrap { width: 100%; }
     /* tab bar sits under the video, player bar beside it, so the short screen keeps room for the list */
     .dock { left: 0; right: 0; grid-template-columns: calc(44vw - 18px) minmax(0, 1fr); align-items: end; }
     .tabbar { order: -1; }
@@ -343,11 +359,17 @@
     .toolbar { top: 0; margin-top: 0; }
     .toolbar h1 { font-size: 30px; }
     .seg { display: none; }
-    .stage { display: flex; flex-direction: column; gap: var(--s4); min-height: 0; overflow-y: auto; padding: 0; scrollbar-width: none; }
-    .stage::-webkit-scrollbar { display: none; }
-    .video-frame { width: 100%; border-radius: var(--r-lg); }
+    /* visible overflow so the ambient glow isn't clipped at the column edge */
+    .stage { display: flex; flex-direction: column; gap: var(--s5); min-height: 0; padding: 0; }
+    .video-wrap { width: 100%; }
+    .video-frame { border-radius: var(--r-lg); }
+    .np { z-index: 1; }
     .dock, .scrim { display: none; }
     .np { padding: var(--s5); }
+  }
+  @media (min-width: 1024px) and (max-height: 720px) {   /* short windows: let the column scroll instead */
+    .stage { overflow-y: auto; scrollbar-width: none; }
+    .stage::-webkit-scrollbar { display: none; }
   }
   @media (min-width: 1440px) {
     .shell { grid-template-columns: 264px minmax(0, 1fr) 460px; gap: var(--s5); padding: var(--s5); }
@@ -440,6 +462,10 @@
           <button class="pill" id="pl-import" type="button">Import playlists</button>
           <input id="pl-file" type="file" accept="application/json" hidden>
         </div>
+        <div class="acct">
+          <div class="line"><h2 class="subhead">Your YouTube playlists</h2><button class="pill" id="acc-load" type="button">Load from YouTube</button></div>
+          <ul class="list" id="acc-playlists"></ul>
+        </div>
       </section>
       <section class="panel" id="panel-settings" aria-labelledby="section-title" hidden>
         <div class="group">
@@ -448,10 +474,12 @@
           <label class="slider"><span>Blur</span><input id="s-blur" type="range" min="0" max="20" step="1"><output id="o-blur"></output></label>
           <label class="slider"><span>Tint</span><input id="s-tint" type="range" min="0" max="0.2" step="0.01"><output id="o-tint"></output></label>
           <div class="line">
+            <button class="pill" id="s-amb" type="button" aria-pressed="true">Ambient glow</button>
             <button class="pill" id="s-lens" type="button" aria-pressed="true">Edge refraction</button>
             <button class="pill" id="s-lite" type="button" aria-pressed="false">Lighter effects</button>
             <button class="pill" id="s-reset" type="button">Reset look</button>
           </div>
+          <p>Ambient glow lights up the space around the video with colours from the song's video frames, changing as it plays.</p>
           <p id="lens-note">Edge refraction bends what is behind the glass, like a lens. It works in Chrome and Edge. Lighter effects turns off the moving colour and refraction if the page feels slow.</p>
         </div>
         <div class="group">
@@ -461,6 +489,20 @@
             <input class="field" id="api-key" type="password" placeholder="Paste your API key" aria-label="YouTube Data API key" autocomplete="off">
             <button class="pill accent" id="api-save" type="button">Save key</button>
           </div>
+        </div>
+        <div class="group">
+          <h2>YouTube account</h2>
+          <p>Connect to import your playlists and liked videos, and to search without an API key. Tune Box asks for read-only access, and the sign-in lasts about an hour without being saved. Setup steps are in the README.</p>
+          <div class="line">
+            <input class="field" id="client-id" type="text" placeholder="Google OAuth client ID" aria-label="Google OAuth client ID" autocomplete="off" spellcheck="false">
+            <button class="pill" id="client-save" type="button">Save client ID</button>
+          </div>
+          <div class="line">
+            <button class="pill accent" id="acc-connect" type="button">Connect YouTube account</button>
+            <button class="pill" id="acc-disconnect" type="button" hidden>Disconnect</button>
+            <button class="pill" id="acc-music" type="button" aria-pressed="true">Import music videos only</button>
+          </div>
+          <p id="acc-status" aria-live="polite"></p>
         </div>
         <div class="group">
           <h2>Keyboard</h2>
@@ -478,18 +520,21 @@
             <button class="pill install-btn" type="button" hidden>Install app</button>
             <button class="pill danger" id="wipe" type="button">Delete saved data</button>
           </div>
-          <p>Deleting removes the queue, likes, history, playlists and API key that Tune Box saved in this browser.</p>
+          <p>Deleting removes the queue, likes, history, playlists, API key and client ID that Tune Box saved in this browser.</p>
         </div>
       </section>
     </div>
   </main>
 
   <section class="stage" id="stage" aria-label="Video">
-    <div class="video-frame" id="video-frame">
-      <div id="player"></div>
-      <div class="video-empty" id="video-empty">
-        <span class="logo" data-icon="play"></span>
-        <p id="status" aria-live="polite">Loading player…</p>
+    <div class="video-wrap">
+      <div class="ambient" aria-hidden="true"><div class="amb-layer" id="amb-a"></div><div class="amb-layer" id="amb-b"></div></div>
+      <div class="video-frame" id="video-frame">
+        <div id="player"></div>
+        <div class="video-empty" id="video-empty">
+          <span class="logo" data-icon="play"></span>
+          <p id="status" aria-live="polite">Loading player…</p>
+        </div>
       </div>
     </div>
     <section class="np glass lens" id="np" aria-label="Now playing">
@@ -618,6 +663,7 @@
     clock: ['s', '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>'],
     gear: ['s', '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'],
     chevDown: ['s', '<polyline points="6 9 12 15 18 9"/>'],
+    download: ['s', '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'],
   };
   function icon(name) {
     const d = ICONS[name], s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -693,6 +739,7 @@
     tint: clamp(Number(store.get('glassTint', DEFAULTS.tint)), 0, 0.2),
     lens: store.get('lens', true) !== false,
     lite: store.get('lite', null) === null ? lowEnd : !!store.get('lite', false),
+    ambient: store.get('ambient', true) !== false,
     section: 'search',
     lastLib: 'liked',
   };
@@ -808,6 +855,75 @@
     im.onload = () => { if (bgId !== id) return; next.style.backgroundImage = 'url("' + thumb(id) + '")'; next.classList.add('on'); cur.classList.remove('on'); };
     im.src = thumb(id);
   }
+  /* ================= ambient glow =================
+     YouTube's own ambient mode reads live frames, which a page can't do with an embedded player.
+     Instead this uses the stills YouTube publishes for each video (the cover, then frames from about
+     25%, 50% and 75% through) and cross-fades between them as the song plays. */
+  const AMB_FRAMES = ['hqdefault', 'hq1', 'hq2', 'hq3'];
+  const frameUrl = (id, f) => 'https://i.ytimg.com/vi/' + id + '/' + f + '.jpg';
+  const amb = { id: '', frame: '', want: '', missing: new Set() };
+  const pickFrame = (p) => (p < 0.15 ? 'hqdefault' : p < 0.375 ? 'hq1' : p < 0.625 ? 'hq2' : 'hq3');
+  function clearAmbient() { amb.id = ''; amb.frame = ''; amb.want = ''; $('#amb-a').classList.remove('on'); $('#amb-b').classList.remove('on'); }
+  function setAmbient(id, p) {
+    if (!state.ambient || !id) { if (amb.id) clearAmbient(); return; }
+    let f = pickFrame(p || 0);
+    if (amb.missing.has(id + '/' + f)) f = 'hqdefault';
+    const key = id + '/' + f;
+    if (amb.want === key) return;
+    amb.want = key;
+    const im = new Image();
+    im.onload = () => {
+      if (amb.want !== key) return;
+      // a missing frame comes back as YouTube's 120x90 grey placeholder; treat that as missing
+      if (f !== 'hqdefault' && im.naturalWidth <= 120) { amb.missing.add(key); amb.want = ''; setAmbient(id, f === 'hq1' ? 0 : p); return; }
+      const a = $('#amb-a'), b = $('#amb-b'), next = a.classList.contains('on') ? b : a, cur = next === a ? b : a;
+      next.style.backgroundImage = 'url("' + frameUrl(id, f) + '")'; next.classList.add('on'); cur.classList.remove('on');
+      amb.id = id; amb.frame = f;
+    };
+    im.onerror = () => { if (f === 'hqdefault') return; amb.missing.add(key); if (amb.want === key) { amb.want = ''; setAmbient(id, 0); } };
+    im.src = frameUrl(id, f);
+  }
+  // tint the page backdrop with the video's main colour (needs CORS on thumbnails; skipped quietly if blocked)
+  let colorFor = '';
+  function sampleColor(id) {
+    if (!id || id === colorFor || !state.ambient) return; colorFor = id;
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = 24; c.height = 14;
+        const ctx = c.getContext('2d'); ctx.drawImage(im, 0, im.naturalHeight * 0.125, im.naturalWidth, im.naturalHeight * 0.75, 0, 0, 24, 14);
+        const d = ctx.getImageData(0, 0, 24, 14).data; let r = 0, g = 0, b = 0, w = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+          const wt = (mx - mn) / 255 * (mx / 255) + 0.02;   // favour vivid, bright pixels
+          r += d[i] * wt; g += d[i + 1] * wt; b += d[i + 2] * wt; w += wt;
+        }
+        if (!w || colorFor !== id) return;
+        let [h, s, l] = rgbToHsl(r / w, g / w, b / w);
+        s = Math.max(s, 0.5); l = clamp(l, 0.38, 0.52);
+        document.documentElement.style.setProperty('--amb', hslToRgb(h, s, l).join(' '));
+      } catch (e) { /* tainted canvas: no CORS, keep the default colour */ }
+    };
+    im.src = 'https://i.ytimg.com/vi/' + id + '/default.jpg';
+  }
+  function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let h = 0, s = 0; const l = (mx + mn) / 2;
+    if (mx !== mn) { const d = mx - mn; s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h /= 6; }
+    return [h, s, l];
+  }
+  function hslToRgb(h, s, l) {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+    const f = (t) => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
+    return [f(h + 1 / 3), f(h), f(h - 1 / 3)].map((v) => Math.round(v * 255));
+  }
+  function applyAmbient() {
+    document.body.classList.toggle('no-ambient', !state.ambient);
+    const b = $('#s-amb'); b.setAttribute('aria-pressed', String(state.ambient));
+    if (!state.ambient) { clearAmbient(); colorFor = ''; document.documentElement.style.removeProperty('--amb'); }
+    else { const id = curId(); setAmbient(id, 0); sampleColor(id); }
+  }
+
   // specular highlight follows the pointer on glass; list rows get a glowing border
   let hlFrame = 0;
   document.addEventListener('pointermove', (e) => {
@@ -884,6 +1000,9 @@
     });
   }
   const curId = () => (state.queue[state.index] ? state.queue[state.index].id : '');
+  const curProgress = () => {
+    try { if (!ready || state.index < 0) return 0; const d = player.getDuration() || 0; return d ? clamp((player.getCurrentTime() || 0) / d, 0, 1) : 0; } catch (e) { return 0; }
+  };
   const isLiked = (id) => state.liked.some((x) => x.id === id);
   const likeAct = (item) => { const on = isLiked(item.id); return { icon: on ? 'heartFill' : 'heart', fn: () => toggleLike(item), label: on ? 'Remove from liked songs' : 'Like', on, pressed: on }; };
   const nextAct = (item) => ({ icon: 'playNext', fn: () => playNext(item), label: 'Play next' });
@@ -969,6 +1088,7 @@
     if (s === 'liked' && state.liked.length) box.append(
       toolBtn('Play all', 'play', () => { state.queue = state.liked.map((x) => ({ ...x })); state.index = -1; saveQueue(); renderQueue(); playAt(0); }),
       toolBtn('Add all to queue', 'plus', () => { state.liked.forEach((x) => addItem({ ...x })); toast('Added ' + state.liked.length + ' songs'); }));
+    if (s === 'liked') box.appendChild(toolBtn('Import from YouTube', 'download', importLiked));
     if (s === 'history' && state.history.length) box.appendChild(toolBtn('Clear history', 'trash', () => { state.history = []; store.set('history', []); renderHistory(); renderTools(); }));
   }
   function moveSeg() {
@@ -1149,6 +1269,7 @@
     $('#mini-title').textContent = it ? (it.title || 'YouTube video') : 'Nothing playing';
     $('#mini-author').textContent = it ? (it.author || 'Open player controls') : 'Open player controls';
     updateLikeBtn(); setBackdrop(it ? it.id : ''); updateEmpty();
+    setAmbient(it ? it.id : '', curProgress()); if (it) sampleColor(it.id);
     if ('mediaSession' in navigator) {
       try {
         navigator.mediaSession.metadata = it ? new MediaMetadata({
@@ -1298,16 +1419,167 @@
       if (!seeking) { s.max = d || 100; s.value = t; fillRange(s); $('#cur').textContent = fmt(t); }
       $('#dur').textContent = fmt(d);
       $('#mini-prog').style.transform = 'scaleX(' + (d ? clamp(t / d, 0, 1) : 0).toFixed(4) + ')';
+      if (has) setAmbient(curId(), d ? t / d : 0);
     } catch (e) { /* player not ready */ }
   }, 500);
 
   /* ================= search, import, share ================= */
+  /* ================= YouTube account (Google sign-in, read-only) =================
+     Uses Google Identity Services' token flow, so it works on a static site with no server.
+     The access token lives only in memory and expires after about an hour. */
+  const SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
+  const ACC = { clientId: typeof store.get('clientId', '') === 'string' ? store.get('clientId', '') : '', token: '', exp: 0, client: null, pending: null, musicOnly: store.get('musicOnly', true) !== false };
+  const gisReady = () => !!(window.google && google.accounts && google.accounts.oauth2);
+  let gisLoading = false;
+  function loadGis(cb) {
+    if (gisReady()) { if (cb) cb(); return; }
+    if (cb) (loadGis.q = loadGis.q || []).push(cb);
+    if (gisLoading) return; gisLoading = true;
+    const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+    s.onload = () => { (loadGis.q || []).splice(0).forEach((f) => f()); };
+    s.onerror = () => { gisLoading = false; s.remove(); updateAccountUI('Google sign-in couldn’t load. Check your connection or network filters, then reload.'); };
+    document.head.appendChild(s);
+  }
+  const tokenOK = () => !!ACC.token && Date.now() < ACC.exp - 60000;
+  function ensureClient() {
+    if (ACC.client) return true;
+    if (!gisReady() || !ACC.clientId) return false;
+    ACC.client = google.accounts.oauth2.initTokenClient({
+      client_id: ACC.clientId, scope: SCOPE,
+      callback: (resp) => {
+        if (!resp || resp.error) { ACC.pending = null; toast('Google sign-in failed' + (resp && resp.error ? ': ' + resp.error : '')); return; }
+        if (google.accounts.oauth2.hasGrantedAllScopes && !google.accounts.oauth2.hasGrantedAllScopes(resp, SCOPE)) { ACC.pending = null; toast('Tune Box needs YouTube read access to import. Connect again and allow it.'); return; }
+        ACC.token = resp.access_token; ACC.exp = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
+        updateAccountUI(); renderTools();
+        const p = ACC.pending; ACC.pending = null; if (p) p(); else toast('YouTube account connected');
+      },
+      error_callback: (e) => {
+        ACC.pending = null;
+        toast(e && e.type === 'popup_closed' ? 'Sign-in closed before it finished' : 'Sign-in didn’t open. Allow pop-ups for this site and try again.');
+      },
+    });
+    return true;
+  }
+  // run fn with a valid token, asking Google for one first if needed (must start from a click)
+  function withAccount(fn) {
+    if (!ACC.clientId) { toast('Add your Google OAuth client ID in Settings first'); go('settings'); setTimeout(() => $('#client-id').focus(), 80); return; }
+    if (tokenOK()) { fn(); return; }
+    if (!ensureClient()) { toast('Google sign-in is still loading. Try again in a moment.'); loadGis(ensureClient); return; }
+    ACC.pending = fn;
+    ACC.client.requestAccessToken({ prompt: '' });
+  }
+  function disconnect() {
+    try { if (ACC.token && gisReady()) google.accounts.oauth2.revoke(ACC.token, () => {}); } catch (e) { /* ignore */ }
+    ACC.token = ''; ACC.exp = 0; accPlaylists = []; renderAccPlaylists(); updateAccountUI(); renderTools(); toast('YouTube account disconnected');
+  }
+  function updateAccountUI(msg) {
+    const on = tokenOK();
+    $('#acc-connect').hidden = on; $('#acc-disconnect').hidden = !on;
+    $('#acc-connect').disabled = !ACC.clientId;
+    const m = $('#acc-music'); m.setAttribute('aria-pressed', String(ACC.musicOnly));
+    $('#acc-status').textContent = msg || (!ACC.clientId ? 'Add a client ID to connect.' : on ? 'Connected. Tune Box will ask Google again when the hour is up.' : 'Not connected.');
+  }
+
   async function api(path, params) {
     const url = new URL('https://www.googleapis.com/youtube/v3/' + path);
-    url.search = new URLSearchParams({ ...params, key: state.apiKey }).toString();
-    const r = await fetch(url), j = await r.json();
+    const q = { ...params }, headers = {};
+    if (tokenOK()) headers.Authorization = 'Bearer ' + ACC.token; else q.key = state.apiKey;
+    url.search = new URLSearchParams(q).toString();
+    const r = await fetch(url, { headers }); let j = {};
+    try { j = await r.json(); } catch (e) { /* non-JSON error */ }
+    if (r.status === 401 && headers.Authorization) { ACC.token = ''; ACC.exp = 0; updateAccountUI(); throw new Error('your YouTube sign-in expired. Connect again'); }
     if (!r.ok) throw new Error((j.error && j.error.message) || ('HTTP ' + r.status));
     return j;
+  }
+  const canQuery = () => tokenOK() || !!state.apiKey;
+
+  async function fetchPlaylistItems(listId, max) {
+    const out = []; let token = '';
+    for (let page = 0; page < Math.ceil((max || 300) / 50); page++) {
+      const params = { part: 'snippet', maxResults: '50', playlistId: listId };
+      if (token) params.pageToken = token;
+      const j = await api('playlistItems', params);
+      (j.items || []).forEach((it) => {
+        const sn = it.snippet; const vid = sn && sn.resourceId && sn.resourceId.videoId;
+        if (!vid || !ID_RE.test(vid) || sn.title === 'Private video' || sn.title === 'Deleted video') return;
+        out.push({ id: vid, title: decode(sn.title), author: decode(sn.videoOwnerChannelTitle || '') });
+      });
+      token = j.nextPageToken; if (!token) break;
+    }
+    return out;
+  }
+  function importLiked() {
+    withAccount(async () => {
+      toast('Importing your liked videos…');
+      let token = '', seen = 0, added = 0;
+      try {
+        for (let page = 0; page < 20; page++) {   // up to 1,000 likes
+          const params = { part: 'snippet', myRating: 'like', maxResults: '50' };
+          if (token) params.pageToken = token;
+          const j = await api('videos', params);
+          (j.items || []).forEach((v) => {
+            if (!v || !ID_RE.test(v.id) || !v.snippet) return;
+            if (ACC.musicOnly && v.snippet.categoryId !== '10') return;
+            seen++;
+            if (!isLiked(v.id)) { state.liked.push({ id: v.id, title: String(v.snippet.title || ''), author: String(v.snippet.channelTitle || '') }); added++; }
+          });
+          token = j.nextPageToken; if (!token) break;
+        }
+        store.set('liked', state.liked); refreshLists(); renderTools();
+        toast(added ? 'Imported ' + added + ' liked ' + (added === 1 ? 'song' : 'songs') : seen ? 'Your liked songs are already here' : ACC.musicOnly ? 'No liked music videos found. Turn off “Import music videos only” in Settings to bring in everything.' : 'No liked videos found');
+      } catch (e) { toast('Import failed: ' + e.message); }
+    });
+  }
+  let accPlaylists = [];
+  function loadMyPlaylists() {
+    withAccount(async () => {
+      const ul = $('#acc-playlists'); ul.textContent = ''; ul.setAttribute('aria-busy', 'true');
+      for (let i = 0; i < 3; i++) { const li = document.createElement('li'); li.className = 'skel'; li.setAttribute('aria-hidden', 'true'); li.innerHTML = '<i class="a"></i><i class="b"></i>'; ul.appendChild(li); }
+      try {
+        let token = ''; const all = [];
+        for (let page = 0; page < 4; page++) {
+          const params = { part: 'snippet,contentDetails', mine: 'true', maxResults: '50' };
+          if (token) params.pageToken = token;
+          const j = await api('playlists', params);
+          (j.items || []).forEach((p) => {
+            if (!p || !/^[\w-]{10,64}$/.test(p.id) || !p.snippet) return;
+            const t = p.snippet.thumbnails || {}, th = (t.medium || t.default || {}).url || '';
+            all.push({ id: p.id, title: String(p.snippet.title || 'Untitled playlist'), count: Number(p.contentDetails && p.contentDetails.itemCount) || 0, thumb: /^https:\/\/i\.ytimg\.com\//.test(th) ? th : '' });
+          });
+          token = j.nextPageToken; if (!token) break;
+        }
+        accPlaylists = all; renderAccPlaylists(true);
+      } catch (e) { accPlaylists = []; renderAccPlaylists(); toast('Couldn’t load playlists: ' + e.message); }
+    });
+  }
+  function renderAccPlaylists(loaded) {
+    const ul = $('#acc-playlists'); ul.textContent = ''; ul.removeAttribute('aria-busy');
+    if (!accPlaylists.length) {
+      if (loaded) emptyState(ul, 'No playlists found in your YouTube account.');
+      else { const li = document.createElement('li'); li.className = 'note'; li.textContent = 'Load your YouTube playlists to play them here or save copies to Tune Box.'; ul.appendChild(li); }
+      return;
+    }
+    accPlaylists.forEach((pl) => {
+      const li = document.createElement('li'); li.className = 'row';
+      const th = document.createElement('div'); th.className = 'th';
+      if (pl.thumb) { const img = new Image(); img.src = pl.thumb; img.alt = ''; img.loading = 'lazy'; th.appendChild(img); }
+      const meta = document.createElement('div'); meta.className = 'meta';
+      const t = document.createElement('span'); t.className = 't'; t.textContent = pl.title;
+      const a = document.createElement('span'); a.className = 'a'; a.textContent = pl.count + (pl.count === 1 ? ' video' : ' videos');
+      meta.append(t, a);
+      const acts = document.createElement('div'); acts.className = 'acts';
+      const run = (fn) => withAccount(async () => {
+        try { toast('Loading “' + pl.title + '”…'); const items = await fetchPlaylistItems(pl.id, 500); if (!items.length) { toast('That playlist has no playable videos'); return; } fn(items); }
+        catch (e) { toast('Couldn’t load that playlist: ' + e.message); }
+      });
+      const play = document.createElement('button'); play.type = 'button'; play.className = 'pill'; play.textContent = 'Play';
+      play.setAttribute('aria-label', 'Play YouTube playlist ' + pl.title);
+      play.addEventListener('click', () => run((items) => { state.queue = items; state.index = -1; saveQueue(); renderQueue(); playAt(0); go('queue'); }));
+      acts.append(play,
+        iconBtn('plus', () => run((items) => { items.forEach((x) => addItem({ ...x })); toast('Added ' + items.length + ' songs to the queue'); }), 'Add YouTube playlist ' + pl.title + ' to queue'),
+        iconBtn('download', () => run((items) => { state.playlists[pl.title] = items.map((x) => ({ id: x.id, title: x.title, author: x.author })); store.set('playlists', state.playlists); renderPlaylists(); toast('Saved “' + pl.title + '” to your Tune Box playlists'); }), 'Save a copy of ' + pl.title + ' in Tune Box'));
+      li.append(th, meta, acts); ul.appendChild(li);
+    });
   }
   function setNote(text, withSettings) {
     const n = $('#results-note'); n.textContent = ''; n.hidden = !text; if (!text) return;
@@ -1322,7 +1594,7 @@
   async function search(q) {
     if (state.section !== 'search') go('search');
     addRecent(q); results = []; renderResults();
-    if (!state.apiKey) { setNote('Search needs a YouTube Data API key. Add one in Settings, or paste a video link instead.', true); return; }
+    if (!canQuery()) { setNote('Search needs a YouTube Data API key or a connected YouTube account. Set either up in Settings, or paste a video link instead.', true); return; }
     setNote('Searching for “' + q + '”…'); $('#recent').hidden = true; showSkeleton();
     try {
       const j = await api('search', { part: 'snippet', type: 'video', videoEmbeddable: 'true', videoCategoryId: '10', maxResults: '20', q });
@@ -1332,21 +1604,11 @@
     } catch (e) { setNote('Search failed: ' + e.message); renderResults(); }
   }
   async function importPlaylist(listId) {
-    if (!state.apiKey) { toast('Playlist import needs an API key. Add one in Settings.'); go('settings'); return; }
-    let token = '', added = 0;
+    if (!canQuery()) { toast('Playlist links need an API key or a connected YouTube account. Set one up in Settings.'); go('settings'); return; }
     try {
-      for (let page = 0; page < 6; page++) {
-        const params = { part: 'snippet', maxResults: '50', playlistId: listId };
-        if (token) params.pageToken = token;
-        const j = await api('playlistItems', params);
-        j.items.forEach((it) => {
-          const sn = it.snippet;
-          if (!sn || !sn.resourceId || sn.title === 'Private video' || sn.title === 'Deleted video') return;
-          addItem({ id: sn.resourceId.videoId, title: decode(sn.title), author: decode(sn.videoOwnerChannelTitle || '') }); added++;
-        });
-        token = j.nextPageToken; if (!token) break;
-      }
-      toast('Imported ' + added + ' songs'); go('queue');
+      const items = await fetchPlaylistItems(listId, 300);
+      items.forEach((x) => addItem(x));
+      toast('Imported ' + items.length + ' songs'); go('queue');
     } catch (e) { toast('Import failed: ' + e.message); }
   }
   async function shareQueue() {
@@ -1439,12 +1701,26 @@
   $('#s-tint').addEventListener('input', (e) => { state.tint = Number(e.target.value); store.set('glassTint', state.tint); applyTheme(); syncSettings(); });
   $('#s-lens').addEventListener('click', () => { state.lens = !state.lens; store.set('lens', state.lens); applyLite(); });
   $('#s-lite').addEventListener('click', () => { state.lite = !state.lite; store.set('lite', state.lite); applyLite(); });
+  $('#s-amb').addEventListener('click', () => { state.ambient = !state.ambient; store.set('ambient', state.ambient); applyAmbient(); toast(state.ambient ? 'Ambient glow on' : 'Ambient glow off'); });
   $('#s-reset').addEventListener('click', () => {
     state.accent = DEFAULTS.accent; state.blur = DEFAULTS.blur; state.tint = DEFAULTS.tint; state.lens = true;
     store.set('accent', state.accent); store.set('glassBlur', state.blur); store.set('glassTint', state.tint); store.set('lens', true);
     applyTheme(); applyLite(); syncSettings(); toast('Look reset');
   });
   if (!lensSupported) $('#lens-note').textContent = 'Edge refraction needs Chrome or Edge, so this browser shows clear glass without it. Lighter effects turns off the moving colour if the page feels slow.';
+  $('#client-id').value = ACC.clientId;
+  $('#client-save').addEventListener('click', () => {
+    const v = $('#client-id').value.trim();
+    if (v && !/^[\w.-]+\.apps\.googleusercontent\.com$/.test(v)) { toast('That doesn’t look like a client ID. It ends in .apps.googleusercontent.com'); return; }
+    ACC.clientId = v; ACC.client = null; ACC.token = ''; ACC.exp = 0; store.set('clientId', v);
+    updateAccountUI(); toast(v ? 'Client ID saved' : 'Client ID removed');
+    if (v) loadGis(ensureClient);
+  });
+  $('#acc-connect').addEventListener('click', () => withAccount(() => toast('YouTube account connected')));
+  $('#acc-disconnect').addEventListener('click', disconnect);
+  $('#acc-music').addEventListener('click', () => { ACC.musicOnly = !ACC.musicOnly; store.set('musicOnly', ACC.musicOnly); updateAccountUI(); });
+  $('#acc-load').addEventListener('click', loadMyPlaylists);
+  setInterval(() => { if (ACC.token && !tokenOK()) { ACC.token = ''; updateAccountUI(); } }, 30000);
   $('#api-key').value = state.apiKey;
   $('#api-save').addEventListener('click', () => { state.apiKey = $('#api-key').value.trim(); store.set('apiKey', state.apiKey); toast(state.apiKey ? 'Key saved' : 'Key removed'); });
   $('#wipe').addEventListener('click', () => {
@@ -1494,10 +1770,13 @@
 
   /* ================= start ================= */
   $$('[data-icon]').forEach((el) => setIcon(el, el.dataset.icon));
-  applyTheme(); syncSettings(); applyLite();
+  applyTheme(); syncSettings(); applyLite(); document.body.classList.toggle('no-ambient', !state.ambient); $('#s-amb').setAttribute('aria-pressed', String(state.ambient));
   fillRange($('#seek')); $('#vol').value = state.volume; fillRange($('#vol'));
   updateControls(); updateSleepBtn(); setPlayingUI(false); renderPlaylists(); refreshLists(); updateNowPlaying();
-  setNote(state.apiKey ? 'Search for a song, or paste a video or playlist link.' : 'Paste a YouTube link to start. Search needs a YouTube Data API key, which you can add in Settings.', !state.apiKey);
+  setNote(state.apiKey || ACC.clientId ? 'Search for a song, or paste a video or playlist link.' : 'Paste a YouTube link to start. Search needs a YouTube Data API key or a connected YouTube account, which you can set up in Settings.', !(state.apiKey || ACC.clientId));
+  updateAccountUI(); renderAccPlaylists();
+  if (ACC.clientId) loadGis(ensureClient);
+  applyAmbient();
   state.queue.forEach(ensureMeta);
   showSection(hashSection() || 'search', true);
   if (/^#[a-z]+$/.test(location.hash)) { try { history.replaceState(null, '', '#/' + state.section); } catch (e) { /* ignore */ } $('#content').scrollTop = 0; }

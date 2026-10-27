@@ -14,6 +14,10 @@ A full-screen, liquid-glass YouTube music player for GitHub Pages. Playback uses
 - In Chrome and Edge, a lens effect bends whatever scrolls behind the glass at its edges. Other browsers show the clear glass without it.
 - A rim light and a highlight that follows your pointer.
 - The backdrop takes its colour from the current song's artwork.
+
+## Ambient glow
+
+Light from the video spills around the player, similar to YouTube's ambient mode. YouTube's own version reads live video frames, which a web page can't do with an embedded player. Tune Box uses the still frames YouTube publishes for each video instead: the cover, then frames from about 25%, 50% and 75% through. It cross-fades between them as the song plays and tints the page with the video's main colour. Turn it off under Settings, then Look.
 - Settings let you change the accent colour, blur, tint and refraction. A "Lighter effects" mode turns on automatically on low-end devices. Reduced transparency and reduced motion settings are respected.
 
 ## Features
@@ -21,6 +25,7 @@ A full-screen, liquid-glass YouTube music player for GitHub Pages. Playback uses
 - Paste a YouTube video or playlist link, or search by name
 - Queue with shuffle, repeat (off, all, one), play next, reorder and remove
 - Liked songs, play history and saved playlists, with JSON export and import
+- Import your liked videos and playlists from your YouTube account (see below)
 - Share your queue as a link
 - Sleep timer (15 to 60 minutes, or after the current song) and playback speed
 - Section links you can bookmark (for example `#/liked`), and the back button works
@@ -43,6 +48,26 @@ Pasting a video link works without any setup. Search and playlist import need a 
 3. Paste the key into the Settings section of the app. It is stored only in your browser.
 
 The default quota allows roughly 100 searches per day, since each search costs 100 units.
+
+## Connect your YouTube account (optional)
+
+Signing in lets Tune Box import your liked videos, play or copy your YouTube playlists, and search without an API key. It asks Google for read-only YouTube access. The sign-in token stays in memory, is never saved, and expires after about an hour, after which Tune Box asks Google again.
+
+Set it up once, in the same Google Cloud project as your API key:
+
+1. Open APIs & Services, then OAuth consent screen. Choose External, fill in the app name and your email, and add the scope `https://www.googleapis.com/auth/youtube.readonly`.
+2. Leave the app in Testing, and add your own Google account under Test users.
+3. Open Credentials, then Create credentials, then OAuth client ID. Choose "Web application" and add `https://<your-username>.github.io` under Authorized JavaScript origins (no path, no trailing slash). No redirect URI is needed.
+4. Copy the client ID (it ends in `.apps.googleusercontent.com`). In Tune Box, open Settings, then YouTube account, paste it, choose "Save client ID", then "Connect YouTube account".
+
+Google shows an "unverified app" warning because the app is in Testing. That's expected for a personal app: choose Continue. Allow pop-ups for your site if the sign-in window doesn't open.
+
+After connecting:
+
+- **Liked songs:** choose "Import from YouTube". By default only music videos are imported; switch off "Import music videos only" in Settings to bring in everything. Songs you like in YouTube Music usually appear in your YouTube likes too.
+- **Playlists:** choose "Load from YouTube" to list your playlists, then play one, add it to the queue, or save a copy in Tune Box.
+
+YouTube Music's automatic playlists (like "Liked music" or mixes) aren't available through the YouTube API, so they can't be imported.
 
 ## Notes
 
